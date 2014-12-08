@@ -1,0 +1,140 @@
+<?xml version="1.0"?>
+<robot name="wheelchair">
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <box size="0.8 0.7 0.2"/>
+            </geometry>
+            <origin rpy="0 0 0" xyz="0.0 0 0.1"/>
+            <material name="leather">
+                <color rgba="0.5 0.5 0.5 1"/>
+                <!--texture filename="package://jaco_description/urdf/leather.jpg" /-->
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.8 0.7 0.2"/>
+            </geometry>
+            <origin rpy="0 0 0" xyz="0.0 0 0.1"/>
+        </collision>
+        <inertial>
+            <mass value="150"/>
+            <inertia ixx="0.4" iyy="0.4" izz="0.2" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    
+    <link name="back">
+        <visual>
+            <geometry>
+                <box size="0.15 0.6 0.8"/>
+            </geometry>
+            <!--origin rpy="0 0 0" xyz="-0.5 0 0.3"/-->
+            <material name="leather" />        
+        </visual>
+    </link>
+
+    <joint name="base_link_to_back" type="fixed">
+        <parent link="base_link"/>
+        <child link="back"/>
+        <origin xyz="-0.4 0 0.4"/>
+    </joint>    
+
+    
+   <!-- main driving wheels -->
+    <link name="left_wheel">
+        <visual>
+            <geometry>
+                <cylinder length="0.06" radius="0.12"/>
+            </geometry>
+            <origin rpy="1.57075 0 0" xyz="0.0 0.0 0.0"/>
+            <material name="wheel">
+                <color rgba="0.0 0.0 0.9 1"/>
+                <!--texture filename="package://jaco_description/urdf/leather.jpg" /-->
+            </material>    
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.06" radius="0.12"/>
+            </geometry>
+            <origin rpy="1.57075 0 0" xyz="0.0 0.0 0.0"/>
+        </collision>
+    </link>
+    <joint name="base_link_to_left_wheel" type="continuous">
+        <parent link="base_link"/>
+        <child link="left_wheel"/>
+        <origin xyz="0.0 0.35 0.0"/>
+        <axis xyz="0 1 0"/>
+    </joint>       
+    
+    <link name="right_wheel">
+        <visual>
+            <geometry>
+                <cylinder length="0.06" radius="0.12"/>
+            </geometry>
+            <origin rpy="1.57075 0 0" xyz="0.0 0.0 0.0"/>
+            <material name="wheel"/>    
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.06" radius="0.12"/>
+            </geometry>
+            <origin rpy="1.57075 0 0" xyz="0.0 0.0 0.0"/>
+        </collision>
+    </link>
+    <joint name="base_link_to_right_wheel" type="continuous">
+        <parent link="base_link"/>
+        <child link="right_wheel"/>
+        <origin xyz="0.0 -0.35 0.0"/>
+        <axis xyz="0 1 0"/>
+    </joint>       
+
+
+   <!-- rear castor wheels -->
+    <link name="left_castor">
+        <visual>
+            <geometry>
+                <cylinder length="0.03" radius="0.08"/>
+            </geometry>
+            <origin rpy="1.57075 0 0" xyz="0.0 0.0 0.0"/>
+            <material name="wheel">
+                <color rgba="0.0 0.0 0.9 1"/>
+                <!--texture filename="package://jaco_description/urdf/leather.jpg" /-->
+            </material>    
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.03" radius="0.08"/>
+            </geometry>
+            <origin rpy="1.57075 0 0" xyz="0.0 0.0 0.0"/>
+        </collision>
+    </link>
+    <joint name="base_link_to_left_castor" type="fixed">
+        <parent link="base_link"/>
+        <child link="left_castor"/>
+        <origin xyz="-0.6 0.27 -0.04"/>
+    </joint>
+
+    <link name="right_castor">
+        <visual>
+            <geometry>
+                <cylinder length="0.03" radius="0.08"/>
+            </geometry>
+            <origin rpy="1.57075 0 0" xyz="0.0 0.0 0.0"/>
+            <material name="wheel">
+                <color rgba="0.0 0.0 0.9 1"/>
+                <!--texture filename="package://jaco_description/urdf/leather.jpg" /-->
+            </material>    
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder length="0.03" radius="0.08"/>
+            </geometry>
+            <origin rpy="1.57075 0 0" xyz="0.0 0.0 0.0"/>
+        </collision>
+    </link>
+    <joint name="base_link_to_right_castor" type="fixed">
+        <parent link="base_link"/>
+        <child link="right_castor"/>
+        <origin xyz="-0.6 -0.27 -0.04"/>
+    </joint> 
+</robot>
