@@ -21,15 +21,25 @@ JacoArmTrajectoryController::JacoArmTrajectoryController(ros::NodeHandle nh, ros
 
   boost::recursive_mutex::scoped_lock lock(api_mutex);
 
+  //ROS_INFO("Trying to initialize JACO API...");
   InitAPI();
+  //ROS_INFO("Api initialized.");
   ros::Duration(1.0).sleep();
+  //ROS_INFO("Starting control API...");
   StartControlAPI();
+  //ROS_INFO("Control API started...");
   ros::Duration(3.0).sleep();
+  //ROS_INFO("Stopping control API...");
   StopControlAPI();
+  //ROS_INFO("Control API stopped.");
 
   // Initialize arm
+  //ROS_INFO("Homing arm...");
   MoveHome();
+  //ROS_INFO("Done.");
+  //ROS_INFO("Initializing fingers...");
   InitFingers();
+  //ROS_INFO("Done.");
   SetFrameType(0); //set end effector to move with respect to the fixed frame
 
   // Initialize joint names
@@ -51,6 +61,7 @@ JacoArmTrajectoryController::JacoArmTrajectoryController(ros::NodeHandle nh, ros
   StartControlAPI();
   SetAngularControl();
   controlType = ANGULAR_CONTROL;
+  eStopEnabled = false;
 
   // Messages
   joint_state_pub_ = nh.advertise<sensor_msgs::JointState>("jaco_arm/joint_states", 1);
@@ -69,6 +80,7 @@ JacoArmTrajectoryController::JacoArmTrajectoryController(ros::NodeHandle nh, ros
   angularPositionServer = nh.advertiseService("jaco_arm/get_angular_position", &JacoArmTrajectoryController::getAngularPosition, this);
   cartesianPositionServer = nh.advertiseService("jaco_arm/get_cartesian_position",
                                                 &JacoArmTrajectoryController::getCartesianPosition, this);
+  eStopServer = nh.advertiseService("jaco_arm/software_estop", &JacoArmTrajectoryController::eStopCallback, this);
 
   // Action servers
   trajectory_server_.start();
@@ -125,6 +137,7 @@ void JacoArmTrajectoryController::update_joint_states()
     joint_vel[3] = velocity_data.Actuators.Actuator4 * DEG_TO_RAD;
     joint_vel[4] = velocity_data.Actuators.Actuator5 * DEG_TO_RAD;
     joint_vel[5] = velocity_data.Actuators.Actuator6 * DEG_TO_RAD;
+    //NOTE: the finger units are arbitrary, but converting them as if they were in degrees provides an approximately correct visualization
     joint_vel[6] = velocity_data.Fingers.Finger1 * DEG_TO_RAD;
     joint_vel[7] = velocity_data.Fingers.Finger2 * DEG_TO_RAD;
     joint_vel[8] = velocity_data.Fingers.Finger3 * DEG_TO_RAD;
@@ -184,6 +197,15 @@ static inline double nearest_equivalent(double desired, double current)
 
 void JacoArmTrajectoryController::execute_trajectory(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal)
 {
+  //cancel check
+  if (eStopEnabled)
+  {
+    control_msgs::FollowJointTrajectoryResult result;
+    result.error_code = control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED;
+    trajectory_server_.setSucceeded(result);
+    return;
+  }
+
   {
     boost::recursive_mutex::scoped_lock lock(api_mutex);
     EraseAllTrajectories();
@@ -248,6 +270,15 @@ void JacoArmTrajectoryController::execute_trajectory(const control_msgs::FollowJ
   int trajectory_size;
   while (trajectory_size > 0)
   {
+    //cancel check
+    if (eStopEnabled)
+    {
+      control_msgs::FollowJointTrajectoryResult result;
+      result.error_code = control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED;
+      trajectory_server_.setSucceeded(result);
+      return;
+    }
+
     //check for preempt requests from clients
     if (trajectory_server_.isPreemptRequested() || !ros::ok())
     {
@@ -302,6 +333,15 @@ void JacoArmTrajectoryController::execute_trajectory(const control_msgs::FollowJ
 
 void JacoArmTrajectoryController::execute_smooth_trajectory(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal)
 {
+  //cancel check
+  if (eStopEnabled)
+  {
+    control_msgs::FollowJointTrajectoryResult result;
+    result.error_code = control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED;
+    smooth_trajectory_server_.setSucceeded(result);
+    return;
+  }
+
   {
     boost::recursive_mutex::scoped_lock lock(api_mutex);
     EraseAllTrajectories();
@@ -427,6 +467,15 @@ void JacoArmTrajectoryController::execute_smooth_trajectory(const control_msgs::
   initialTrajectorySize = trajectory_size;
   while (trajectory_size > 0)
   {
+    //cancel check
+    if (eStopEnabled)
+    {
+      control_msgs::FollowJointTrajectoryResult result;
+      result.error_code = control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED;
+      smooth_trajectory_server_.setSucceeded(result);
+      return;
+    }
+
     //check for preempt requests from clients
     if (smooth_trajectory_server_.isPreemptRequested() || !ros::ok())
     {
@@ -465,6 +514,15 @@ void JacoArmTrajectoryController::execute_smooth_trajectory(const control_msgs::
 
 void JacoArmTrajectoryController::execute_joint_trajectory(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal)
 {
+  //check for cancel
+  if (eStopEnabled)
+  {
+    control_msgs::FollowJointTrajectoryResult result;
+    result.error_code = control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED;
+    smooth_joint_trajectory_server.setSucceeded(result);
+    return;
+  }
+
   float trajectoryPoints[NUM_JACO_JOINTS][goal->trajectory.points.size()];
   int numPoints = goal->trajectory.points.size();
 
@@ -540,7 +598,13 @@ void JacoArmTrajectoryController::execute_joint_trajectory(const control_msgs::F
 
   while (!trajectoryComplete)
   {
-    //update_joint_states();
+    if (eStopEnabled)
+    {
+      control_msgs::FollowJointTrajectoryResult result;
+      result.error_code = control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED;
+      smooth_joint_trajectory_server.setSucceeded(result);
+      return;
+    }
 
     //check for preempt requests from clients
     if (smooth_joint_trajectory_server.isPreemptRequested())
@@ -655,6 +719,15 @@ void JacoArmTrajectoryController::execute_joint_trajectory(const control_msgs::F
 
 void JacoArmTrajectoryController::execute_gripper(const control_msgs::GripperCommandGoalConstPtr &goal)
 {
+  //check for cancel
+  if (eStopEnabled)
+  {
+    control_msgs::GripperCommandResult result;
+    result.reached_goal = false;
+    gripper_server_.setSucceeded(result);
+    return;
+  }
+
   wpi_jaco_msgs::AngularCommand cmd;
   cmd.position = true;
   cmd.armCommand = false;
@@ -668,9 +741,19 @@ void JacoArmTrajectoryController::execute_gripper(const control_msgs::GripperCom
   angularCmdPublisher.publish(cmd);
 
   ros::Rate rate(10);
-  int trajectory_size = 1;
-  while (trajectory_size > 0)
+  bool gripperMoving = true;
+  while (gripperMoving)
   {
+    //check for cancel
+    if (eStopEnabled)
+    {
+      control_msgs::GripperCommandResult result;
+      result.reached_goal = false;
+      gripper_server_.setSucceeded(result);
+      return;
+    }
+
+    rate.sleep();
     //check for preempt requests from clients
     if (gripper_server_.isPreemptRequested() || !ros::ok())
     {
@@ -688,16 +771,18 @@ void JacoArmTrajectoryController::execute_gripper(const control_msgs::GripperCom
       return;
     }
 
-    TrajectoryFIFO Trajectory_Info;
-    memset(&Trajectory_Info, 0, sizeof(Trajectory_Info));
+    //see if fingers are still moving
+    AngularPosition velocity_data;
     {
       boost::recursive_mutex::scoped_lock lock(api_mutex);
-      GetGlobalTrajectoryInfo(Trajectory_Info);
+      GetAngularVelocity(velocity_data);
     }
-    trajectory_size = Trajectory_Info.TrajectoryCount;
-    rate.sleep();
+    float totalSpeed = fabs(velocity_data.Fingers.Finger1) + fabs(velocity_data.Fingers.Finger2) + fabs(velocity_data.Fingers.Finger3);
+    if (totalSpeed <= 0.01)
+    {
+      gripperMoving = false;
+    }
   }
-
   //stop gripper control
   cmd.position = false;
   cmd.fingers[0] = 0.0;
@@ -706,10 +791,21 @@ void JacoArmTrajectoryController::execute_gripper(const control_msgs::GripperCom
   angularCmdPublisher.publish(cmd);
 
   control_msgs::GripperCommandResult result;
-  result.position = joint_pos[6];
-  result.effort = joint_eff[6];
+  AngularPosition force_data;
+
+  AngularPosition position_data;
+  {
+    GetAngularPosition(position_data);
+    GetAngularForce(force_data);
+  }
+  float finalError = fabs(goal->command.position - position_data.Fingers.Finger1) + fabs(goal->command.position - position_data.Fingers.Finger2) + fabs(goal->command.position - position_data.Fingers.Finger3);
+  if (finalError <= FINGER_ERROR_THRESHOLD)
+    result.reached_goal = true;
+  else
+    result.reached_goal = false;
+  result.position = position_data.Fingers.Finger1;
+  result.effort =force_data.Fingers.Finger1;
   result.stalled = false;
-  result.reached_goal = true;
   gripper_server_.setSucceeded(result);
 }
 
@@ -719,17 +815,39 @@ void JacoArmTrajectoryController::execute_gripper(const control_msgs::GripperCom
 
 void JacoArmTrajectoryController::home_arm(const wpi_jaco_msgs::HomeArmGoalConstPtr &goal)
 {
-  boost::recursive_mutex::scoped_lock lock(api_mutex);
+  //check for cancel
+  if (eStopEnabled)
+  {
+    wpi_jaco_msgs::HomeArmResult result;
+    result.success = false;
+    home_arm_server.setSucceeded(result);
+    return;
+  }
 
-  StopControlAPI();
-  MoveHome();
-  StartControlAPI();
+  {
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
+    StopControlAPI();
+    MoveHome();
+    StartControlAPI();
+  }
 
   if (goal->retract)
   {
-    //retract to given position
-    controlType = ANGULAR_CONTROL;
-    SetAngularControl();
+    //check for cancel
+    if (eStopEnabled)
+    {
+      wpi_jaco_msgs::HomeArmResult result;
+      result.success = false;
+      home_arm_server.setSucceeded(result);
+      return;
+    }
+
+    {
+      boost::recursive_mutex::scoped_lock lock(api_mutex);
+      //retract to given position
+      controlType = ANGULAR_CONTROL;
+      SetAngularControl();
+    }
 
     angularCmdPublisher.publish(goal->retractPosition);
 
@@ -737,6 +855,15 @@ void JacoArmTrajectoryController::home_arm(const wpi_jaco_msgs::HomeArmGoalConst
     int trajectory_size = 1;
     while (trajectory_size > 0)
     {
+      //check for cancel
+      if (eStopEnabled)
+      {
+        wpi_jaco_msgs::HomeArmResult result;
+        result.success = false;
+        home_arm_server.setSucceeded(result);
+        return;
+      }
+
       //check for preempt requests from clients
       if (home_arm_server.isPreemptRequested() || !ros::ok())
       {
@@ -759,6 +886,7 @@ void JacoArmTrajectoryController::home_arm(const wpi_jaco_msgs::HomeArmGoalConst
   }
   else
   {
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
     //set control type to previous value
     if (controlType == ANGULAR_CONTROL)
       SetAngularControl();
@@ -777,15 +905,19 @@ void JacoArmTrajectoryController::home_arm(const wpi_jaco_msgs::HomeArmGoalConst
 
 void JacoArmTrajectoryController::angularCmdCallback(const wpi_jaco_msgs::AngularCommand& msg)
 {
-  boost::recursive_mutex::scoped_lock lock(api_mutex);
+  if (eStopEnabled)
+    return;
 
   //take control of the arm
-  EraseAllTrajectories();
-
-  if (controlType != ANGULAR_CONTROL)
   {
-    SetAngularControl();
-    controlType = ANGULAR_CONTROL;
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
+    EraseAllTrajectories();
+
+    if (controlType != ANGULAR_CONTROL)
+    {
+      SetAngularControl();
+      controlType = ANGULAR_CONTROL;
+    }
   }
 
   TrajectoryPoint jacoPoint;
@@ -797,10 +929,13 @@ void JacoArmTrajectoryController::angularCmdCallback(const wpi_jaco_msgs::Angula
     if (msg.position)
     {
       jacoPoint.Position.Type = ANGULAR_POSITION;
+      AngularPosition position_data;
 
       float current_joint_pos[6];
-      AngularPosition position_data;
-      GetAngularPosition(position_data);
+      {
+        boost::recursive_mutex::scoped_lock lock(api_mutex);
+        GetAngularPosition(position_data);
+      }
       current_joint_pos[0] = position_data.Actuators.Actuator1 * DEG_TO_RAD;
       current_joint_pos[1] = position_data.Actuators.Actuator2 * DEG_TO_RAD;
       current_joint_pos[2] = position_data.Actuators.Actuator3 * DEG_TO_RAD;
@@ -835,13 +970,21 @@ void JacoArmTrajectoryController::angularCmdCallback(const wpi_jaco_msgs::Angula
   }
   else
   {
-    jacoPoint.Position.Type = ANGULAR_VELOCITY;
-    jacoPoint.Position.Actuators.Actuator1 = 0.0;
-    jacoPoint.Position.Actuators.Actuator2 = 0.0;
-    jacoPoint.Position.Actuators.Actuator3 = 0.0;
-    jacoPoint.Position.Actuators.Actuator4 = 0.0;
-    jacoPoint.Position.Actuators.Actuator5 = 0.0;
-    jacoPoint.Position.Actuators.Actuator6 = 0.0;
+    if (msg.position)
+    {
+      fingerPositionControl(msg.fingers[0], msg.fingers[1], msg.fingers[2]);
+      return;
+    }
+    else
+    {
+      jacoPoint.Position.Type = ANGULAR_VELOCITY;
+      jacoPoint.Position.Actuators.Actuator1 = 0.0;
+      jacoPoint.Position.Actuators.Actuator2 = 0.0;
+      jacoPoint.Position.Actuators.Actuator3 = 0.0;
+      jacoPoint.Position.Actuators.Actuator4 = 0.0;
+      jacoPoint.Position.Actuators.Actuator5 = 0.0;
+      jacoPoint.Position.Actuators.Actuator6 = 0.0;
+    }
   }
 
   //populate finger command
@@ -861,10 +1004,12 @@ void JacoArmTrajectoryController::angularCmdCallback(const wpi_jaco_msgs::Angula
   //send command
   if (msg.position)
   {
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
     SendBasicTrajectory(jacoPoint);
   }
   else
   {
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
     if (msg.repeat)
     {
       //send the command repeatedly for ~1/60th of a second
@@ -883,15 +1028,19 @@ void JacoArmTrajectoryController::angularCmdCallback(const wpi_jaco_msgs::Angula
 
 void JacoArmTrajectoryController::cartesianCmdCallback(const wpi_jaco_msgs::CartesianCommand& msg)
 {
-  boost::recursive_mutex::scoped_lock lock(api_mutex);
+  if (eStopEnabled)
+    return;
 
   //take control of the arm
-  EraseAllTrajectories();
-
-  if (controlType != CARTESIAN_CONTROL)
   {
-    SetCartesianControl();
-    controlType = CARTESIAN_CONTROL;
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
+    EraseAllTrajectories();
+
+    if (controlType != CARTESIAN_CONTROL)
+    {
+      SetCartesianControl();
+      controlType = CARTESIAN_CONTROL;
+    }
   }
 
   TrajectoryPoint jacoPoint;
@@ -913,15 +1062,23 @@ void JacoArmTrajectoryController::cartesianCmdCallback(const wpi_jaco_msgs::Cart
   }
   else
   {
-    jacoPoint.Position.Type = CARTESIAN_VELOCITY;
-    jacoPoint.Position.CartesianPosition.X = 0.0;
-    jacoPoint.Position.CartesianPosition.Y = 0.0;
-    jacoPoint.Position.CartesianPosition.Z = 0.0;
-    jacoPoint.Position.CartesianPosition.ThetaX = 0.0;
-    jacoPoint.Position.CartesianPosition.ThetaY = 0.0;
-    jacoPoint.Position.CartesianPosition.ThetaZ = 0.0;
+    if (msg.position)
+    {
+      fingerPositionControl(msg.fingers[0], msg.fingers[1], msg.fingers[2]);
+      return;
+    }
+    else
+    {
+      jacoPoint.Position.Type = ANGULAR_VELOCITY;
+      jacoPoint.Position.Actuators.Actuator1 = 0.0;
+      jacoPoint.Position.Actuators.Actuator2 = 0.0;
+      jacoPoint.Position.Actuators.Actuator3 = 0.0;
+      jacoPoint.Position.Actuators.Actuator4 = 0.0;
+      jacoPoint.Position.Actuators.Actuator5 = 0.0;
+      jacoPoint.Position.Actuators.Actuator6 = 0.0;
+    }
   }
-  EraseAllTrajectories();
+
   //populate finger command
   if (msg.fingerCommand)
   {
@@ -939,10 +1096,12 @@ void JacoArmTrajectoryController::cartesianCmdCallback(const wpi_jaco_msgs::Cart
   //send command
   if (msg.position)
   {
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
     SendBasicTrajectory(jacoPoint);
   }
   else
   {
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
     SendBasicTrajectory(jacoPoint);
     if (msg.repeat)
     {
@@ -958,8 +1117,109 @@ void JacoArmTrajectoryController::cartesianCmdCallback(const wpi_jaco_msgs::Cart
   }
 }
 
+void JacoArmTrajectoryController::fingerPositionControl(float f1, float f2, float f3)
+{
+  if (eStopEnabled)
+    return;
+
+  f1 = max(f1, .02f);
+  f2 = max(f2, .02f);
+  f3 = max(f3, .02f);
+
+  TrajectoryPoint jacoPoint;
+  jacoPoint.InitStruct();
+  jacoPoint.Position.Type = ANGULAR_VELOCITY;
+  jacoPoint.Position.Actuators.Actuator1 = 0.0;
+  jacoPoint.Position.Actuators.Actuator2 = 0.0;
+  jacoPoint.Position.Actuators.Actuator3 = 0.0;
+  jacoPoint.Position.Actuators.Actuator4 = 0.0;
+  jacoPoint.Position.Actuators.Actuator5 = 0.0;
+  jacoPoint.Position.Actuators.Actuator6 = 0.0;
+  jacoPoint.Position.HandMode = VELOCITY_MODE;
+
+  bool goalReached = false;
+  AngularPosition position_data;
+  float error[3];
+  float prevTotalError;
+  float counter = 0; //check if error is unchanging, this likely means a finger is blocked by something so the controller should terminate
+  vector<float> errorFinger1;
+  vector<float> errorFinger2;
+  vector<float> errorFinger3;
+  errorFinger1.resize(10);
+  errorFinger2.resize(10);
+  errorFinger3.resize(10);
+  for (unsigned int i = 0; i < errorFinger1.size(); i ++)
+  {
+    errorFinger1[i] = 0.0;
+    errorFinger2[i] = 0.0;
+    errorFinger3[i] = 0.0;
+  }
+  ros::Rate rate(600);
+  while (!goalReached)
+  {
+    {
+      boost::recursive_mutex::scoped_lock lock(api_mutex);
+
+      //get current finger position
+      GetAngularPosition(position_data);
+      error[0] = f1 - position_data.Fingers.Finger1;
+      error[1] = f2 - position_data.Fingers.Finger2;
+      error[2] = f3 - position_data.Fingers.Finger3;
+
+      float totalError = fabs(error[0]) + fabs(error[1]) + fabs(error[2]);
+      if (totalError == prevTotalError)
+      {
+        counter++;
+      }
+      else
+      {
+        counter = 0;
+        prevTotalError = totalError;
+      }
+
+      if (totalError < FINGER_ERROR_THRESHOLD || counter > 40)
+      {
+        goalReached = true;
+        jacoPoint.Position.Fingers.Finger1 = 0.0;
+        jacoPoint.Position.Fingers.Finger2 = 0.0;
+        jacoPoint.Position.Fingers.Finger3 = 0.0;
+      }
+      else
+      {
+        float errorSum[3] = {0};
+        for (unsigned int i = 0; i < errorFinger1.size(); i++)
+        {
+          errorSum[0] += errorFinger1[i];
+          errorSum[1] += errorFinger2[i];
+          errorSum[2] += errorFinger3[i];
+        }
+        jacoPoint.Position.Fingers.Finger1 = max(min(KP_F * error[0] + KV_F * (error[0] - errorFinger1.front()) + KI_F * errorSum[0], 30.0), -30.0);
+        jacoPoint.Position.Fingers.Finger2 = max(min(KP_F * error[1] + KV_F * (error[1] - errorFinger2.front()) + KI_F * errorSum[1], 30.0), -30.0);
+        jacoPoint.Position.Fingers.Finger3 = max(min(KP_F * error[2] + KV_F * (error[2] - errorFinger3.front()) + KI_F * errorSum[2], 30.0), -30.0);
+        errorFinger1.insert(errorFinger1.begin(), error[0]);
+        errorFinger2.insert(errorFinger2.begin(), error[1]);
+        errorFinger3.insert(errorFinger3.begin(), error[2]);
+        errorFinger1.resize(10);
+        errorFinger2.resize(10);
+        errorFinger3.resize(10);
+      }
+      EraseAllTrajectories();
+      SendBasicTrajectory(jacoPoint);
+    }
+
+    //check for cancel requests
+    if (eStopEnabled)
+      return;
+
+    rate.sleep();
+  }
+}
+
 void JacoArmTrajectoryController::executeAngularTrajectoryPoint(TrajectoryPoint point, bool erase)
 {
+  if (eStopEnabled)
+    return;
+
   boost::recursive_mutex::scoped_lock lock(api_mutex);
 
   if (controlType != ANGULAR_CONTROL)
@@ -976,6 +1236,9 @@ void JacoArmTrajectoryController::executeAngularTrajectoryPoint(TrajectoryPoint 
 
 void JacoArmTrajectoryController::executeCartesianTrajectoryPoint(TrajectoryPoint point, bool erase)
 {
+  if (eStopEnabled)
+    return;
+
   boost::recursive_mutex::scoped_lock lock(api_mutex);
 
   if (controlType != CARTESIAN_CONTROL)
@@ -1015,6 +1278,52 @@ bool JacoArmTrajectoryController::getCartesianPosition(wpi_jaco_msgs::GetCartesi
   res.pos.angular.x = pos.Coordinates.ThetaX;
   res.pos.angular.y = pos.Coordinates.ThetaY;
   res.pos.angular.z = pos.Coordinates.ThetaZ;
+
+  return true;
+}
+
+bool JacoArmTrajectoryController::eStopCallback(wpi_jaco_msgs::EStop::Request &req, wpi_jaco_msgs::EStop::Response &res)
+{
+  ROS_INFO("In callback");
+
+  res.success = true;
+  if (req.enableEStop)
+  {
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
+    ROS_INFO("Software emergency stop request received.");
+    if (!eStopEnabled)
+    {
+      int stopResult = StopControlAPI();
+      if (stopResult != NO_ERROR)
+      {
+        ROS_INFO("Error stopping arm control.");
+        res.success = false;
+      }
+      stopResult = EraseAllTrajectories();
+      if (stopResult != NO_ERROR)
+      {
+        ROS_INFO("Error stopping arm trajectories.");
+        res.success = false;
+      }
+      eStopEnabled = true;
+    }
+  }
+  else
+  {
+    boost::recursive_mutex::scoped_lock lock(api_mutex);
+    ROS_INFO("Turning off software emergency stop.");
+    if (eStopEnabled)
+    {
+      StopControlAPI();
+      ros::Duration(0.05).sleep();
+      StartControlAPI();
+      if (controlType == ANGULAR_CONTROL)
+        SetAngularControl();
+      else
+        SetCartesianControl();
+      eStopEnabled = false;
+    }
+  }
 
   return true;
 }

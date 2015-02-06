@@ -2,6 +2,31 @@
 Changelog for package wpi_jaco_wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.0.13 (2015-02-03)
+-------------------
+* Result on gripper control action server now reports correctly.
+* Initial adjustment of gripper action server to fix result feedback
+* Contributors: David Kent
+
+0.0.12 (2015-01-20)
+-------------------
+* Tuned finger position controller, added detection and termination if the fingers are blocked from reaching their goal
+* Finger position control test
+* Removed unused debug statement
+* Adjusted angular and cartesian command callbacks to correctly execute finger position commands when arm joint commands are not specified
+* Contributors: David Kent
+
+0.0.11 (2014-12-18)
+-------------------
+
+0.0.10 (2014-12-12)
+-------------------
+
+0.0.9 (2014-12-02)
+------------------
+* Added service call to get angular position of arm joints
+* Contributors: David Kent
+
 0.0.8 (2014-10-22)
 ------------------
 * tuning

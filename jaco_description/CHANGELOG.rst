@@ -2,6 +2,42 @@
 Changelog for package jaco_description
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.0.13 (2015-02-03)
+-------------------
+* fixed catkin install bug
+* min
+* remin
+* moved to .jpg
+* fixed small ring & minified
+* Merge remote-tracking branch 'upstream/develop' into manual-texturing
+* finished retexturing
+* link 4,5,small ring. swapped colors
+* link 2
+* finished link 1
+* large ring complete
+* textred large ring manually
+* added materials
+* changed to .jpg
+* changed to jpegs
+* minifinified and fixed textures
+* replaced with recolored dae's
+* added materials
+* Contributors: Peter, Russell Toris
+
+0.0.12 (2015-01-20)
+-------------------
+
+0.0.11 (2014-12-18)
+-------------------
+* minify script
+* Contributors: Russell Toris
+
+0.0.10 (2014-12-12)
+-------------------
+
+0.0.9 (2014-12-02)
+------------------
+
 0.0.8 (2014-10-22)
 ------------------
 

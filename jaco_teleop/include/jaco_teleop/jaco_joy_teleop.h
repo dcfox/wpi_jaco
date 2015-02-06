@@ -13,7 +13,9 @@
 #define JACO_JOY_TELEOP_H_
 
 #include <ros/ros.h>
+#include <wpi_jaco_msgs/AngularCommand.h>
 #include <wpi_jaco_msgs/CartesianCommand.h>
+#include <wpi_jaco_msgs/EStop.h>
 #include <sensor_msgs/Joy.h>
 
 //Control modes
@@ -78,10 +80,13 @@ private:
 
   ros::NodeHandle node; /*!< a handle for this ROS node */
 
+  ros::Publisher angular_cmd; /*!< angular arm command topic */
   ros::Publisher cartesian_cmd; /*!< cartesian arm command topic */
   ros::Subscriber joy_sub; /*!< the joy topic */
 
-  wpi_jaco_msgs::CartesianCommand fingerCmd; /*!< angular movement command */
+  ros::ServiceClient eStopClient; /*!< arm software emergency stop service client */
+
+  wpi_jaco_msgs::AngularCommand fingerCmd; /*!< finger movement command */
   wpi_jaco_msgs::CartesianCommand cartesianCmd; /*!< cartesian movement command */
 
   int mode; /*!< the control mode */
