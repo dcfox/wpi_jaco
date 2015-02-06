@@ -1,0 +1,6 @@
+#include <wpi_jaco_msg/msg/CartesianCommand.msg>
+position = True;
+armCommand = True;
+fingerCommand = False;
+repeat = True;
+arm = ; #Vector3 linear & Vector3 angular

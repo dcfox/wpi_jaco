@@ -1,0 +1,11 @@
+(1) Have the arm move to a Cartesian position
+(2) Have the fingers pick something up
+(3) Have the arm move to second Cartesian position
+This is all done using the actions in wpi_jaco_msgs/action
+
+Current issues:
+	Not sure how to write an action that uses another action
+	Don't know what locations we want yet.
+		Will need something that prints coordinates
+	Don't know what coordinates mean open hand/closed hand
+	Closed hand should be changed to velocity since it will never completely close

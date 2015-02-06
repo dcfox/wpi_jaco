@@ -1,0 +1,8 @@
+<launch>
+  
+  <node name="HomeArm" pkg="wpi_jaco/wpi_jaco_msg/action" type="action" output="screen">
+    <env name="retract" type="bool" value="True" />
+    <env name="retractPosition" type="wpi_jaco_msgs/CartesianCommand" value="$(find jaco_ptp/Positions)/position2" /> <!-- not sure if written correctly -->
+    <env name="numAttempts" type="int16" value="1" /> <!-- note this means there is no path planning -->
+  </node>
+</launch>

@@ -11,3 +11,4 @@ Contributors
 ------------
 
  * [Russell Toris](rctoris@wpi.edu)
+ * [Daniel Fox](dcfox@wpi.edu)
