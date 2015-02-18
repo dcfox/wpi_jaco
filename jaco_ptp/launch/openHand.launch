@@ -1,7 +1,8 @@
 <launch>
    <node name="ExecuteGrasp" pkg="wpi_jaco/wpi_jaco_msg/action" type="action" output="screen">
    <env name="closeGripper" type="bool" value="False" />
-   <env name="limitFingerVelocity" type"bool" value"False" /> <!-- may want to change this in the future>
+   <env name="limitFingerVelocity" type"bool" value="True" />
+   <env name ="fingerVelocities" type="wpi_jaco_msgs/JacoFingerVel" value="TODO" <!-- may want to change this in the future> 
    <env name="fingerJoints" type"float32[]" value"[]" /> <!-- This will need to be measured/found>
   </node>
 </launch>
