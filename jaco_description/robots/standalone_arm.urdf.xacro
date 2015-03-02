@@ -12,23 +12,23 @@
 	xmlns:renderable="http://playerstage.sourceforge.net/gazebo/xmlschema/#renderable"
 	xmlns:physics="http://playerstage.sourceforge.net/gazebo/xmlschema/#physics"
 	xmlns:xacro="http://ros.org/wiki/xacro" name="jaco">
-	<xacro:include filename="$(find jaco_description)/urdf/new_model.urdf.xacro" />
+	<xacro:include filename="$(find jaco_description)/urdf/table_model.urdf.xacro" />
 
 	
 	<link name="root">
 		<visual>
-			<origin xyz="0 0 0.5" rpy="0 0 0" />
+			<origin xyz="0 0 0.88265" rpy="0 0 0" />
 			<geometry>
 				<box size = "0 0 0" />
 			</geometry>
 		</visual>
 		<collision>
-			<origin xyz="0 0 0.5" rpy="0 0 0" />
+			<origin xyz="0 0 0.88265" rpy="0 0 0" />
 			<geometry>
 				<box size = "0 0 0" />
 			</geometry>
 		</collision>
 	</link>
 
-	<xacro:jaco_arm parent="root" xyz="0 0 0.5" rpy="0 0 0" />
+	<xacro:jaco_arm parent="root" xyz="0 0 0.88265" rpy="0 0 0" />
 </robot>

@@ -59,12 +59,7 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        back:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_link:
+        holder:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -164,27 +159,12 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        left_castor:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        left_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        right_castor:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        right_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
         root:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        table:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -245,10 +225,10 @@ Visualization Manager:
         Z: 0.642417
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.130203
+      Pitch: 0.055203
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.90859
+      Yaw: 4.79359
     Saved: ~
 Window Geometry:
   Displays:
